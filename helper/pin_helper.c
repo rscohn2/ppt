@@ -7,20 +7,41 @@ void ppt_to_tool(enum to_tool_codes code, void* arg) {
 static PyObject *
 trace_method(PyObject *self, PyObject *args) {
   PyObject* o;
+  PyObject* method_name_o;
+  PyObject* module_name_o;
+  struct trace_method_info i = {0,0,0};
+
   if (!PyArg_ParseTuple(args, "O", &o)) {
     return NULL;
   }
+  Py_INCREF(o);
   
-  struct trace_method_info i;
   i.address = PyCFunction_GET_FUNCTION(o);
-  i.method_name = PyString_AsString(PyObject_GetAttrString(o,"__name__"));
-  i.module_name = PyString_AsString(PyObject_GetAttrString(o,"__module__"));
+  method_name_o = PyObject_GetAttrString(o,"__name__");
+  if (method_name_o) {
+    i.method_name = PyString_AsString(method_name_o);
+    Py_DECREF(method_name_o);
+  }
+  module_name_o = PyObject_GetAttrString(o,"__module__");
+  if (module_name_o) {
+    i.module_name = PyString_AsString(module_name_o);
+    Py_DECREF(module_name_o);
+  }
+
   ppt_to_tool(TRACE_METHOD, &i);
-  Py_RETURN_NONE;
+
+  Py_INCREF(Py_None);
+  return Py_None;
 }
 
 static PyObject *
 test(PyObject *self, PyObject *args) {
+  Py_INCREF(Py_None);
+  return Py_None;
+}
+
+PyObject *
+experiments(PyObject *self, PyObject *args) {
   PyObject* o;
 
   if (!PyArg_ParseTuple(args, "O", &o)) {
@@ -37,8 +58,6 @@ test(PyObject *self, PyObject *args) {
   void* meth = PyCFunction_GET_FUNCTION(o);
   printf("meth: %p\n",meth);
   printf("&trace_method: %p\n",&trace_method);
-  PyObject* ml = PyObject_GetAttrString(o,"__ml__");
-  printf("ml: %p\n",ml);
 
   PyObject* frame = (PyObject*)PyEval_GetFrame();
   PyObject* code = PyObject_GetAttrString(frame, "f_code");
@@ -56,15 +75,8 @@ static PyMethodDef Methods[] = {
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 
-void ppt_helper(int code, void* args) {
-  switch(code) {
-  default:
-    fprintf(stderr, "ppt_helper unknown code: %d\n", code);
-  }
-}
-
 PyMODINIT_FUNC
-initpinpytrace(void)
+initpinhelper(void)
 {
-    (void) Py_InitModule("pinpytrace", Methods);
+    (void) Py_InitModule("pinhelper", Methods);
 }

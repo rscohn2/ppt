@@ -1,6 +1,11 @@
 # Emacs
 *~
 
+*.log
+
+*.pyc
+helper/build
+
 # Compiled Object files
 *.slo
 *.lo

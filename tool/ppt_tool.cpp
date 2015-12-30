@@ -45,10 +45,12 @@ END_LEGAL */
 #include "pin.H"
 #include "portability.H"
 #include "string.h"
-#include <vector>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <map>
+#include <set>
+#include "../helper/ppt_helper_interface.h"
 
 /* ===================================================================== */
 /* Commandline Switches */
@@ -100,6 +102,8 @@ LOCALFUN VOID Indent()
 
 LOCALVAR VOID* getAttrString_p = 0;
 LOCALVAR VOID* asString_p = 0;
+LOCALVAR map<void*, char*> entry_map;
+LOCALVAR set<char const*> entries;
 
 LOCALFUN void* getAttrString(CONTEXT* ctxt, char const* field, void* obj)
 {
@@ -135,51 +139,19 @@ LOCALFUN VOID LeaveEvalFrame(VOID* v)
   indent--;
 }
 
-LOCALFUN VOID InstrumentPyEvalEx(TRACE trace) 
-{
-  RTN rtn = TRACE_Rtn(trace);
-
-  if (!RTN_Valid(rtn))
-    return;
-
-  if (RTN_Name(rtn) != "PyEval_EvalFrameEx")
-    return;
-
-  for (BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl))
-  {
-    for (INS ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins))
-    {
-      if (INS_Address(ins) == RTN_Address(rtn)) {
-	INS_InsertCall(ins, IPOINT_BEFORE, AFUNPTR(EnterEvalFrame), IARG_CONTEXT, IARG_G_ARG0_CALLEE, IARG_END);
-      }
-
-      if (INS_IsRet(ins)) {
-	INS_InsertCall(ins, IPOINT_BEFORE, AFUNPTR(LeaveEvalFrame), IARG_END);
-      }
-    }
-  }
-
-}
-
 /* ===================================================================== */
 
-LOCALFUN VOID Trace(TRACE trace, VOID *v)
+LOCALFUN VOID recordEntry(char const* name, BOOL clear)
 {
-    InstrumentPyEvalEx(trace);
-}
+  // if we are entering from python clear all the names
+  if (clear)
+    entries.clear();
 
+  // only print a name once for each entrace from python
+  if (entries.find(name) != entries.end())
+    return;
+  entries.insert(name);
 
-/* ===================================================================== */
-
-LOCALFUN VOID Fini(int, VOID * v)
-{
-    out << "# $eof" <<  endl;
-
-    out.close();
-}
-
-LOCALFUN VOID recordEntry(char const* name)
-{
   Indent();
   out << "  " << name << endl;
   Flush();
@@ -194,9 +166,26 @@ LOCALFUN VOID instrumentEntryPoints(IMG img)
       RTN_Open(rtn);
       string name = IMG_Name(img) + ":" + RTN_Name(rtn);
       char const* n = strdup(name.c_str());
-      RTN_InsertCall(rtn, IPOINT_BEFORE, AFUNPTR(recordEntry), IARG_PTR, n, IARG_END);
+      RTN_InsertCall(rtn, IPOINT_BEFORE, AFUNPTR(recordEntry), IARG_PTR, n, IARG_BOOL, false, IARG_END);
       RTN_Close(rtn);
     }
+  }
+}
+
+LOCALFUN void trace_method(struct trace_method_info* i)
+{
+  string s = string(i->module_name) + ":" + i->method_name;
+  entry_map[i->address] = strdup(s.c_str());
+}
+
+LOCALFUN VOID receiveHelp(INT n, VOID* args) 
+{
+  switch(n) {
+  case TRACE_METHOD:
+    trace_method(static_cast<struct trace_method_info*>(args));
+    break;
+  default:
+    cerr << "Unknown help: " << n << endl;
   }
 }
 
@@ -206,12 +195,55 @@ LOCALFUN VOID ImageLoad(IMG img, VOID *)
     RTN rtn = RTN_FindByName(img, "PyObject_GetAttrString");
     if ( RTN_Valid( rtn ))
       getAttrString_p = reinterpret_cast<VOID *>(RTN_Address(rtn));
+
     rtn = RTN_FindByName(img, "PyString_AsString");
     if ( RTN_Valid( rtn ))
       asString_p = reinterpret_cast<VOID *>(RTN_Address(rtn));
 
+    rtn = RTN_FindByName(img, "ppt_to_tool");
+    if ( RTN_Valid( rtn )) {
+      RTN_Open(rtn);
+      RTN_InsertCall(rtn, IPOINT_BEFORE, AFUNPTR(receiveHelp), IARG_G_ARG0_CALLEE, IARG_G_ARG1_CALLEE, IARG_END);
+      RTN_Close(rtn);
+    }
+
     if (IMG_Name(img).find("/ext/lib/libmkl") != string::npos)
       instrumentEntryPoints(img);
+}
+
+LOCALFUN VOID Trace(TRACE trace, VOID* v) 
+{
+  RTN rtn = TRACE_Rtn(trace);
+  BOOL inEvalFrame = RTN_Valid(rtn) && RTN_Name(rtn) == "PyEval_EvalFrameEx";
+
+  for (BBL bbl = TRACE_BblHead(trace); BBL_Valid(bbl); bbl = BBL_Next(bbl))
+  {
+    for (INS ins = BBL_InsHead(bbl); INS_Valid(ins); ins = INS_Next(ins))
+    {
+      void* address = reinterpret_cast<void*>(INS_Address(ins));
+      if (entry_map.count(address)) {
+	INS_InsertCall(ins, IPOINT_BEFORE, AFUNPTR(recordEntry), IARG_PTR, entry_map[address], IARG_BOOL, true, IARG_END);
+      }
+
+      if (inEvalFrame) {
+	if (INS_Address(ins) == RTN_Address(rtn)) {
+	  INS_InsertCall(ins, IPOINT_BEFORE, AFUNPTR(EnterEvalFrame), IARG_CONTEXT, IARG_G_ARG0_CALLEE, IARG_END);
+	}
+
+	if (INS_IsRet(ins)) {
+	  INS_InsertCall(ins, IPOINT_BEFORE, AFUNPTR(LeaveEvalFrame), IARG_END);
+	}
+      }
+    }
+  }
+
+}
+
+LOCALFUN VOID Fini(int, VOID * v)
+{
+    out << "# $eof" <<  endl;
+
+    out.close();
 }
 
 /* ===================================================================== */
