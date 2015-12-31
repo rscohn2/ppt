@@ -10,5 +10,4 @@ pintool:
 	cd tool; make obj-intel64/ppt_tool.so
 
 test: ext pintool
-	$(PIN_ROOT)/pin -t tool/obj-intel64/ppt_tool.so -o helper.out -- $(PYTHON) test/test_helper.py
-	$(PIN_ROOT)/pin -t tool/obj-intel64/ppt_tool.so -o matmul.out -- $(PYTHON) -m ppt.__main__ test/matmul.py
+	$(PIN_ROOT)/pin -t tool/obj-intel64/ppt_tool.so -- $(PYTHON) -m ppt.__main__ test/matmul.py

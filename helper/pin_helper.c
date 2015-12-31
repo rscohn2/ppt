@@ -5,73 +5,33 @@ void ppt_to_tool(enum to_tool_codes code, void* arg) {
 }
 
 static PyObject *
-trace_method(PyObject *self, PyObject *args) {
-  PyObject* o;
-  PyObject* method_name_o;
-  PyObject* module_name_o;
-  struct trace_method_info i = {0,0,0};
+start_trace(PyObject *self, PyObject *args) {
 
-  if (!PyArg_ParseTuple(args, "O", &o)) {
-    return NULL;
-  }
-  Py_INCREF(o);
-  
-  i.address = PyCFunction_GET_FUNCTION(o);
-  method_name_o = PyObject_GetAttrString(o,"__name__");
-  if (method_name_o) {
-    i.method_name = PyString_AsString(method_name_o);
-    Py_DECREF(method_name_o);
-  }
-  module_name_o = PyObject_GetAttrString(o,"__module__");
-  if (module_name_o) {
-    i.module_name = PyString_AsString(module_name_o);
-    Py_DECREF(module_name_o);
-  }
-
-  ppt_to_tool(TRACE_METHOD, &i);
-
-  Py_INCREF(Py_None);
-  return Py_None;
-}
-
-static PyObject *
-test(PyObject *self, PyObject *args) {
-  Py_INCREF(Py_None);
-  return Py_None;
-}
-
-PyObject *
-experiments(PyObject *self, PyObject *args) {
-  PyObject* o;
-
-  if (!PyArg_ParseTuple(args, "O", &o)) {
-    return NULL;
-  }
-
-  PyObject* repr = PyObject_Repr(o);
-  printf("repr: %s\n",PyString_AsString(repr));
-
-  PyObject* name = PyObject_GetAttrString(o,"__name__");
-  printf("name: %s\n",PyString_AsString(name));
-  PyObject* module = PyObject_GetAttrString(o,"__module__");
-  printf("module: %s\n",PyString_AsString(module));
-  void* meth = PyCFunction_GET_FUNCTION(o);
-  printf("meth: %p\n",meth);
-  printf("&trace_method: %p\n",&trace_method);
-
-  PyObject* frame = (PyObject*)PyEval_GetFrame();
-  PyObject* code = PyObject_GetAttrString(frame, "f_code");
-  PyObject* bname = PyObject_GetAttrString (code, "co_name");
-  printf("bname: %s\n",PyString_AsString(bname));
+  ppt_to_tool(START_TRACE, 0);
 
   Py_RETURN_NONE;
 }
 
+static PyObject *
+stop_trace(PyObject *self, PyObject *args) {
+  char const** p;
+  int i;
+
+  ppt_to_tool(STOP_TRACE, &p);
+
+  PyObject* l = PyList_New(0);
+  for (i = 0; p[i]; i++) {
+    PyList_Append(l, Py_BuildValue("s", p[i]));
+  }
+
+  return l;
+}
+
 static PyMethodDef Methods[] = {
-    {"trace_method",  trace_method, METH_VARARGS,
-     "trace a method"},
-    {"test",  test, METH_VARARGS,
-     "test function."},
+    {"start_trace",  start_trace, METH_VARARGS,
+     "start tracing native execution"},
+    {"stop_trace",  stop_trace, METH_VARARGS,
+     "stop tracing native execution"},
     {NULL, NULL, 0, NULL}        /* Sentinel */
 };
 

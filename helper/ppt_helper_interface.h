@@ -1,5 +1,6 @@
 enum to_tool_codes {
-  TRACE_METHOD
+  START_TRACE,
+  STOP_TRACE
 };
 
 struct trace_method_info {

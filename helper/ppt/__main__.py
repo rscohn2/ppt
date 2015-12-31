@@ -42,8 +42,6 @@ def main(argv=None):
     progname = prog_argv[0]
     sys.path[0] = os.path.split(progname)[0]
 
-    ppt.process_mods(mods)
-
     try:
         with open(progname) as fp:
             code = compile(fp.read(), progname, 'exec')
@@ -54,7 +52,8 @@ def main(argv=None):
             '__package__': None,
             '__cached__': None,
         }
-        exec code in globs, globs
+        with ppt.PPT() as p:
+            exec code in globs, globs
     except IOError, err:
         _err_exit("Cannot run file %r because: %s" % (sys.argv[0], err))
     except SystemExit:
