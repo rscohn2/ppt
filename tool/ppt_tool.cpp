@@ -102,6 +102,11 @@ LOCALFUN VOID ImageLoad(IMG img, VOID *)
       instrumentEntryPoints(img);
 }
 
+LOCALFUN VOID ThreadStart(THREADID threadid, CONTEXT *ctxt, INT32 flags, VOID *v)
+{
+  ASSERT(threadid == 0, "This tool does not support multithreaded programs");
+}
+    
 /* ===================================================================== */
 
 int main(int argc, CHAR *argv[])
@@ -114,6 +119,7 @@ int main(int argc, CHAR *argv[])
     }
     
     IMG_AddInstrumentFunction(ImageLoad, 0);
+    PIN_AddThreadStartFunction(ThreadStart, 0);
 
     // Never returns
     PIN_StartProgram();
