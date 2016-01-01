@@ -52,7 +52,7 @@ def main(argv=None):
             '__package__': None,
             '__cached__': None,
         }
-        with ppt.PPT() as p:
+        with ppt.PPT(graph=True) as p:
             exec code in globs, globs
     except IOError, err:
         _err_exit("Cannot run file %r because: %s" % (sys.argv[0], err))

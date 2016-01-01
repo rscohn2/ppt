@@ -1,24 +1,24 @@
 import sys
 
 import ppt.pinhelper as ph
+import ppt.cg as cg
+import ppt.log as log
 
 class PPT:
-    def __init__(self):
-        return
+    def __init__(self, graph = False):
+        if graph:
+            self.recorder = cg.CallGraph()
+        else:
+            self.recorder = log.Log()
 
     def __enter__(self):
-        self.indent = 0
-        self.out = open('ppt.out','w')
         self.old_dispatch = sys.getprofile()
         sys.setprofile(self.trace_dispatch)
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):
         sys.setprofile(self.old_dispatch)
-        self.out.close()
-
-    def log(self, str):
-        self.out.write('  ' * self.indent + str + '\n')
+        self.recorder.close()
 
     def format_frame(self, frame):
         return frame.f_code.co_filename + ':' + frame.f_code.co_name
@@ -31,23 +31,16 @@ class PPT:
 
     def trace_dispatch(self, frame, event, arg):
         if event is 'call':
-            self.log('call ' + self.format_frame(frame))
-            self.indent += 1
+            self.recorder.call(self.format_frame(frame))
         elif event is 'return':
-            self.log('return ' + self.format_frame(frame))
-            self.indent -= 1
+            self.recorder.ret(self.format_frame(frame))
         elif event is 'c_call':
-            self.log('ccall ' + self.format_ccall(arg))
-            self.indent += 1
+            self.recorder.call(self.format_ccall(arg))
             ph.start_trace()
         elif event is 'c_return':
             cfunctions = ph.stop_trace()
             for f in cfunctions:
-                self.log('ccall ' + f)
-            self.log('creturn ' + self.format_ccall(arg))
-            self.indent -= 1
+                self.recorder.ncall(f)
+            self.recorder.ret( self.format_ccall(arg))
         elif event is 'c_exception':
-            self.log('cexception ' + self.format_frame(frame))
-            self.indent -= 1
-        else:
-            self.log('Unknown event: ' + event + ' Name: ' + frame.f_code.co_name)
+            self.recorder.ret(self.format_frame(frame))
