@@ -14,3 +14,6 @@ test: ext pintool
 
 scipy: ext pintool
 	$(PIN_ROOT)/pin -t tool/obj-intel64/ppt_tool.so -- $(PYTHON) -m ppt.__main__ test/scipybench.py
+
+numscipytest: ext pintool
+	$(PIN_ROOT)/pin -t tool/obj-intel64/ppt_tool.so -- $(PYTHON) -m ppt.__main__ test/numscipytest.py

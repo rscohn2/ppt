@@ -1,4 +1,6 @@
 import sys
+import inspect
+import json
 
 import ppt.pinhelper as ph
 import ppt.cg as cg
@@ -20,27 +22,26 @@ class PPT:
         sys.setprofile(self.old_dispatch)
         self.recorder.close()
 
-    def format_frame(self, frame):
-        return frame.f_code.co_filename + ':' + frame.f_code.co_name
+    def get_frame(self, frame):
+        m = inspect.getmodule(frame)
+        return (frame.f_code.co_name, m.__name__ if m else 'root')
 
-    def format_ccall(self, func):
-        if func.__module__:
-            return func.__module__ + ':' + func.__name__
-        else:
-            return ':' + func.__name__
+    def get_ccall(self, func):
+        return (func.__name__, func.__module__ if func.__module__ else 'root')
 
     def trace_dispatch(self, frame, event, arg):
         if event is 'call':
-            self.recorder.call(self.format_frame(frame))
+            self.recorder.call(self.get_frame(frame))
         elif event is 'return':
-            self.recorder.ret(self.format_frame(frame))
+            self.recorder.ret(self.get_frame(frame))
         elif event is 'c_call':
-            self.recorder.call(self.format_ccall(arg))
+            self.recorder.call(self.get_ccall(arg))
             ph.start_trace()
         elif event is 'c_return':
             cfunctions = ph.stop_trace()
             for f in cfunctions:
-                self.recorder.ncall(f)
-            self.recorder.ret( self.format_ccall(arg))
+                x = f.split(':')
+                self.recorder.ncall((x[0],x[1]))
+            self.recorder.ret( self.get_ccall(arg))
         elif event is 'c_exception':
-            self.recorder.ret(self.format_frame(frame))
+            self.recorder.ret(self.get_frame(frame))

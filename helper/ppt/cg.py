@@ -1,7 +1,9 @@
+import json
+
 class Node(dict):
-    def __init__(self, name, mark):
-        self.name = name
-        self.mark = mark
+    def __init__(self, key, native):
+        self.key = key
+        self.native = native
         return
 
 class CallStack():
@@ -30,28 +32,32 @@ class CallGraph(dict):
     def close(self):
         self.dump(force=True)
 
-    def lookup(self, name, mark=False):
-        if name in self:
-            return self[name]
-        n = Node(name, mark)
-        self[name] = n
+    def lookup(self, key, native=False):
+        if key in self:
+            return self[key]
+        n = Node(key, native)
+        self[key] = n
         return n
 
-    def ncall(self, name):
-        n = self.lookup(name, True)
-        self.callstack.top()[name] = n
+    def ncall(self, key):
+        n = self.lookup(key, True)
+        self.callstack.top()[key] = n
         self.dump()
 
-    def call(self, name):
-        n = self.lookup(name)
-        self.callstack.top()[name] = n
+    def call(self, key):
+        n = self.lookup(key)
+        self.callstack.top()[key] = n
         self.callstack.push(n)
         self.dump()
 
-    def ret(self, name):
+    def ret(self, key):
         self.callstack.pop()
 
-    def mark(self):
+    def mark_native(self):
+        '''Set mark if a function is native or calls native code'''
+        for src in self:
+            n = self[src]
+            n.mark = n.native
         changed = True
         while changed:
             changed = False
@@ -69,12 +75,8 @@ class CallGraph(dict):
     def annotated_name(self, node):
         return ('**' if node.mark else '') + node.name
 
-    def dump(self, force=False):
-        self.dumpcount -= 1
-        if not force and self.dumpcount > 0:
-            return
-        self.dumpcount = 10000
-        self.mark()
+    def write_graph(self):
+        self.mark_native()
         with open(self.filename, 'w') as fp:
             fp.write('Callgraph\n')
             fp.write('---------\n')
@@ -84,3 +86,19 @@ class CallGraph(dict):
                 for dst in n:
                     fp.write('  ' + self.annotated_name(n[dst]) + '\n')
             fp.write('#EOF\n')
+
+    def node_dict(self, src):
+        return {'key': src.key, 'native': src.native, 'dsts': [src[dst].key for dst in src]}
+
+    def write_json_graph(self):
+        d = {'nodes': [self.node_dict(self[src]) for src in self]}
+        with open(self.filename, 'w') as fp:
+             json.dump(d, fp, indent=4)
+        
+    def dump(self, force=False):
+        self.dumpcount -= 1
+        if not force and self.dumpcount > 0:
+            return
+        self.dumpcount = 100000
+        self.write_json_graph()
+
