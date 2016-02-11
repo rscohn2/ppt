@@ -7,6 +7,7 @@ Configuration
 -------------
 
 PPT relies on pin to trace the native code. You need to download pin from here: https://software.intel.com/en-us/articles/pin-a-binary-instrumentation-tool-downloads
+
     tar zxf pin-.....tar.gz
 
 1. Point PIN_ROOT in makefile to the top level directory of the pin kit
