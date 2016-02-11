@@ -11,6 +11,7 @@ pintool:
 
 test: ext pintool
 	$(PIN_ROOT)/pin -t tool/obj-intel64/ppt_tool.so -- $(PYTHON) -m ppt.__main__ test/matmul.py
+	python cgview.py
 
 scipy: ext pintool
 	$(PIN_ROOT)/pin -t tool/obj-intel64/ppt_tool.so -- $(PYTHON) -m ppt.__main__ test/scipybench.py
